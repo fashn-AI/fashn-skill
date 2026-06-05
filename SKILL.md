@@ -1,0 +1,205 @@
+---
+name: fashn
+description: Integrate FASHN fashion-AI image & video generation into a project, or run it inline. Use for virtual try-on, product-to-model, model create/swap, face-to-model, edit, reframe, background remove/change, packshot, and image-to-video — via the FASHN REST API, the TypeScript SDK (fashn npm), or the Python SDK (fashn pip).
+allowed-tools: Bash, Read, Write, Edit
+---
+
+# FASHN — Fashion AI API & SDKs
+
+FASHN is a fashion-AI platform: virtual try-on, AI models, product photography, editing, and image-to-video. Everything runs through **one prediction endpoint** that takes a `model_name` plus an `inputs` object.
+
+This skill helps you do two things:
+
+1. **Integrate FASHN into a project** — write production code against the REST API, the **TypeScript SDK** (`fashn` on npm), or the **Python SDK** (`fashn` on PyPI).
+2. **Run a one-off generation inline** — execute a single call and hand the result back to the user (see [Inline quickstart](#inline-quickstart)).
+
+When the user asks to *add FASHN to their app / repo*, integrate (write code into their project). When they ask to *just do a try-on / generate an image now*, run it inline.
+
+> Full per-endpoint parameter tables, the error catalog, webhooks, and credits live in **[reference.md](reference.md)** — load it when you need exact `inputs` for a given `model_name`.
+
+## Authentication
+
+- Get an API key from the Developer API dashboard: https://app.fashn.ai/api
+- Store it as the `FASHN_API_KEY` environment variable. **Never hard-code it or expose it client-side** — all FASHN calls are server-side.
+- REST: send `Authorization: Bearer $FASHN_API_KEY`.
+- Both SDKs read `FASHN_API_KEY` from the environment by default.
+
+Before running anything, confirm the key exists: `echo "${FASHN_API_KEY:+set}"` should print `set`. If it's empty, ask the user to provide/export it.
+
+## Core concepts (apply to every path)
+
+**One endpoint, many models.** Every request is `{ model_name, inputs }`. Available `model_name`s:
+
+| Category | `model_name` | Required inputs |
+|---|---|---|
+| Virtual try-on (flagship) | `tryon-max` | `model_image`, `product_image` |
+| Virtual try-on (legacy/fast) | `tryon-v1.6` | `model_image`, `garment_image` |
+| Product → person wearing it | `product-to-model` | `product_image` |
+| Generate a model from a prompt | `model-create` | `prompt` |
+| Change a model's identity | `model-swap` | `model_image` |
+| Headshot → upper-body avatar | `face-to-model` | `face_image` |
+| Freeform edit | `edit` | `image`, `prompt` |
+| Change aspect ratio (outpaint/crop) | `reframe` | `image`, `aspect_ratio` |
+| Remove background → transparent PNG | `background-remove` | `image` |
+| Replace background from a prompt | `background-change` | `image`, `prompt` |
+| Commercial product packshot | `packshot` | `product_image` |
+| Animate an image → video | `image-to-video` | `image` |
+
+**Prediction lifecycle.** Two ways to get a result:
+
+- **`subscribe` (recommended)** — submit and auto-poll until a terminal state, then return the final result. Both SDKs expose this; for raw REST you implement the poll loop yourself.
+- **Manual `run` + `status`** — `run` returns a prediction `id` immediately; poll `status(id)` until `completed`/`failed`. Use this for fire-and-forget, your own queue, or when pairing with **webhooks**.
+
+**Response envelope.** A terminal prediction looks like:
+
+```json
+{ "id": "...", "status": "completed", "output": ["https://cdn.fashn.ai/.../output_0.png"], "error": null }
+```
+
+- `status`: `starting` → `in_queue` → `processing` → `completed` | `failed` (SDK `subscribe` may also return `canceled` / `time_out`).
+- `output`: array of CDN image URLs (or base64 if `return_base64: true`); MP4 URLs for `image-to-video`. **CDN URLs expire after 72h; base64 outputs after 60min.**
+- `error`: `null` on success, else `{ name, message }`.
+
+**Credits.** Spend is returned in the `x-fashn-credits-used` response header (REST) and as `creditsUsed` (TS) / `credits_used` (Python) on the result. **Failed predictions are not charged.** Cost scales with `generation_mode` and `resolution` — see reference.md. Check the balance with `GET /v1/credits`.
+
+**Errors — two kinds:**
+- *API errors* (HTTP 4xx/5xx, before the job runs): SDKs throw (`APIError` subclasses); REST returns `{ "error": "<Code>", "message": "..." }`.
+- *Runtime errors* (job ran but failed): HTTP 200 with `status: "failed"` and `error: { name, message }` — e.g. `ImageLoadError`, `ContentModerationError`, `PoseError`. Always branch on `status` even when no exception is thrown.
+
+**Limits:** `/v1/run` 50 req/60s, `/v1/status` 50 req/10s, max **6 concurrent** predictions. Keep batches ≤ 6 in flight.
+
+---
+
+## Path A — TypeScript SDK (`fashn`)
+
+Install into the user's project: `npm install fashn`
+
+```ts
+import Fashn from 'fashn';
+
+const client = new Fashn(); // reads FASHN_API_KEY from env
+
+// Recommended: submit + auto-poll to completion
+const result = await client.predictions.subscribe({
+  model_name: 'tryon-max',
+  inputs: {
+    model_image: 'https://example.com/person.jpg',
+    product_image: 'https://example.com/garment.jpg',
+  },
+  // optional: pollInterval (ms, default 1000), timeout (ms, default 300000),
+  onEnqueued: (id) => console.log('queued', id),
+  onQueueUpdate: (s) => console.log('status', s.status),
+});
+
+if (result.status === 'completed') {
+  console.log(result.output, 'credits:', result.creditsUsed);
+} else {
+  console.error('failed:', result.status, result.error?.name, result.error?.message);
+}
+```
+
+Manual lifecycle:
+
+```ts
+const { id } = await client.predictions.run({ model_name: 'tryon-max', inputs: { /* ... */ } });
+const status = await client.predictions.status(id); // poll until terminal
+```
+
+Error handling (API vs runtime):
+
+```ts
+try {
+  const r = await client.predictions.subscribe({ model_name: 'tryon-max', inputs: { /* ... */ } });
+  if (r.status !== 'completed') console.error('runtime error:', r.error?.name, r.error?.message);
+} catch (err) {
+  if (err instanceof Fashn.APIError) console.error('API error:', err.status, err.message);
+  else throw err;
+}
+```
+
+## Path B — Python SDK (`fashn`)
+
+Install into the user's project: `pip install fashn`
+
+```python
+import fashn
+from fashn import Fashn
+
+client = Fashn()  # reads FASHN_API_KEY from env
+
+result = client.predictions.subscribe(
+    model_name="tryon-max",
+    inputs={
+        "model_image": "https://example.com/person.jpg",
+        "product_image": "https://example.com/garment.jpg",
+    },
+)
+
+if result.status == "completed":
+    print(result.output, "credits:", result.credits_used)
+else:
+    print("failed:", result.status, result.error)
+```
+
+Manual lifecycle: `client.predictions.run(...)` → `client.predictions.status(prediction_id)`.
+Async: use `from fashn import AsyncFashn` and `await client.predictions.subscribe(...)`.
+API errors raise `fashn.APIError` (`e.status_code`, `e.message`); runtime failures arrive as `result.status == "failed"` with `result.error`.
+
+## Path C — REST (any language)
+
+Base URL `https://api.fashn.ai/v1`. Submit, then poll.
+
+```bash
+# Submit → returns {"id": "...", "error": null}
+curl -s -X POST https://api.fashn.ai/v1/run \
+  -H "Authorization: Bearer $FASHN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model_name":"tryon-max","inputs":{
+        "model_image":"https://example.com/person.jpg",
+        "product_image":"https://example.com/garment.jpg"}}'
+
+# Poll → repeat until status is "completed" or "failed"
+curl -s https://api.fashn.ai/v1/status/<id> -H "Authorization: Bearer $FASHN_API_KEY" -i
+#   read x-fashn-credits-used from the response headers
+
+# Balance
+curl -s https://api.fashn.ai/v1/credits -H "Authorization: Bearer $FASHN_API_KEY"
+```
+
+**Webhooks** (skip polling): append `?webhook_url=` to `/run`. FASHN POSTs the terminal payload (`completed`/`failed`) to that URL, retrying up to 5 times over ~5 min. There's no signature header, so make the handler idempotent and respond 2xx fast. Details in reference.md.
+
+---
+
+## Inline quickstart
+
+For a single ad-hoc generation where the user just wants the result now (not an integration), run the TS SDK from an isolated dir so you don't touch their project:
+
+1. Ensure installed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
+2. Confirm the key: `echo "${FASHN_API_KEY:+set}"`
+3. Run inline with a 120s timeout (subscribe polls until done):
+
+```bash
+cd ~/.fashn && node --input-type=module -e "
+import Fashn from 'fashn';
+const client = new Fashn();
+const r = await client.predictions.subscribe({
+  model_name: 'tryon-max',
+  inputs: {
+    model_image: 'https://example.com/person.jpg',
+    product_image: 'https://example.com/garment.jpg',
+  },
+});
+if (r.status === 'completed') console.log(JSON.stringify(r.output, null, 2));
+else console.error('Failed:', r.status, r.error?.name, r.error?.message);
+"
+```
+
+Do **not** write script files for inline runs. Cap concurrency at 6 when processing multiple images.
+
+## Reference
+
+See **[reference.md](reference.md)** for every endpoint's full `inputs` (types, allowed values, defaults), the complete error catalog, credit/pricing notes, webhook payloads, and rate limits.
+
+## User's request
+
+$ARGUMENTS

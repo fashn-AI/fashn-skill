@@ -1,0 +1,15 @@
+# Dependencies (inline-run sandbox at ~/.fashn, or project installs)
+node_modules/
+package-lock.json
+
+# Secrets / API keys
+.env
+.env.*
+!.env.example
+
+# Local Claude Code overrides (personal, not shared)
+.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+*.log
