@@ -316,9 +316,8 @@ FASHN POSTs the terminal envelope to that URL:
 | `POST /v1/run` | 50 requests / 60s |
 | `GET /v1/status/{id}` | 50 requests / 10s |
 | `GET /v1/credits` | 30 requests / 10s |
-| Concurrency | 6 simultaneous predictions |
 
-When batching, keep ≤ 6 predictions in flight and handle `429` (`RateLimitExceeded` / `ConcurrencyLimitExceeded`) with backoff.
+When batching, handle `429` (`RateLimitExceeded` / `ConcurrencyLimitExceeded`) with backoff.
 
 ## Notes
 

@@ -79,7 +79,7 @@ Never echo the key back, never write it to a shell profile (`~/.zshrc`, etc.), a
 - *API errors* (HTTP 4xx/5xx, before the job runs): SDKs throw (`APIError` subclasses); REST returns `{ "error": "<Code>", "message": "..." }`.
 - *Runtime errors* (job ran but failed): HTTP 200 with `status: "failed"` and `error: { name, message }` — e.g. `ImageLoadError`, `ContentModerationError`, `PoseError`. Always branch on `status` even when no exception is thrown.
 
-**Limits:** `/v1/run` 50 req/60s, `/v1/status` 50 req/10s, max **6 concurrent** predictions. Keep batches ≤ 6 in flight.
+**Limits:** `/v1/run` 50 req/60s, `/v1/status` 50 req/10s. Handle `429` responses with backoff when batching.
 
 ---
 
@@ -208,7 +208,7 @@ else console.error('Failed:', r.status, r.error?.name, r.error?.message);
 "
 ```
 
-Do **not** write script files for inline runs. Cap concurrency at 6 when processing multiple images.
+Do **not** write script files for inline runs. When processing many images, back off on `429` responses.
 
 ## Reference
 
