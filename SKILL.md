@@ -27,9 +27,15 @@ When the user asks to *add FASHN to their app / repo*, integrate (write code int
 
 1. `FASHN_API_KEY` env var — preferred, and what integration code, CI, and deploys use. Check: `echo "${FASHN_API_KEY:+set}"`.
 2. Cache file `~/.fashn/.env` — load, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`.
-3. Otherwise, ask the user.
+3. Otherwise, ask the user — and cache it (next bullet).
 
-**Caching (inline use only, with explicit consent)** so later inline runs don't re-prompt: `umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' "<key>" > ~/.fashn/.env; chmod 600 ~/.fashn/.env`. Never echo the key, write it to a shell profile, or commit it.
+**Caching (inline use only).** When you had to ask the user for the key, **save it to `~/.fashn/.env` by default** (right after you receive it) so later inline runs don't re-prompt — then tell the user it's cached there and that `rm ~/.fashn/.env` removes it. Only skip if they decline. Run:
+
+```bash
+umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' '<key>' > ~/.fashn/.env; chmod 600 ~/.fashn/.env
+```
+
+Never echo the key back, write it to a shell profile, or commit it.
 
 **Integrations differ:** pull the key from the *project's* own env (gitignored `.env`) or secret manager — never `~/.fashn/.env` or anywhere in the repo.
 
