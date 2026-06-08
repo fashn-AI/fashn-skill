@@ -15,8 +15,7 @@ The skill knows the full FASHN surface (every endpoint, its `inputs`, the error 
 | Generate / swap a model | `model-create` · `model-swap` |
 | Headshot → upper-body avatar | `face-to-model` |
 | Freeform edit · reframe | `edit` · `reframe` |
-| Background remove / change | `background-remove` · `background-change` |
-| Commercial packshot | `packshot` |
+| Remove background | `background-remove` |
 | Image → video | `image-to-video` |
 
 ## Install

@@ -208,38 +208,6 @@ Removes the background, producing a transparent PNG cutout. Up to ~4 MP. Fast (~
 | `image` | image | ✅ | Source |
 | `return_base64` | bool | | Returns base64 PNG instead of CDN URL |
 
-### Background Change: `background-change`
-
-Detects the foreground subject and replaces the background from a prompt, harmonizing lighting.
-
-| Input | Type | Req | Notes |
-|---|---|---|---|
-| `image` | image | ✅ | Subject to preserve |
-| `prompt` | string | ✅ | New background, e.g. `"beach sunset"`, `"modern office"` |
-| `generation_mode` | `fast`\|`balanced`\|`quality` | | |
-| `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1-4 | | |
-| `output_format` | `png`\|`jpeg` | | |
-| `seed` | int | | |
-| `return_base64` | bool | | |
-
-### Packshot: `packshot`
-
-Turns a product photo into a clean commercial packshot (studio presentation), optionally guided by a style reference.
-
-| Input | Type | Req | Notes |
-|---|---|---|---|
-| `product_image` | image | ✅ | Product to present |
-| `prompt` | string | | Styling, e.g. `"clean white background flat-lay"`, `"soft studio lighting on a beige pedestal"` |
-| `image_context` | image | | Style reference (staging, background, lighting) |
-| `aspect_ratio` | enum | | |
-| `generation_mode` | `fast`\|`balanced`\|`quality` | | |
-| `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1-4 | | |
-| `output_format` | `png`\|`jpeg` | | |
-| `seed` | int | | |
-| `return_base64` | bool | | |
-
 ### Image to Video: `image-to-video`
 
 Animates a single image into a short fashion clip. `output` is an MP4 CDN URL.

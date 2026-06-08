@@ -1,6 +1,6 @@
 ---
 name: fashn
-description: Integrate FASHN generative image & video models for fashion into a project, or run it inline. Use for virtual try-on, product-to-model, model create/swap, face-to-model, edit, reframe, background remove/change, packshot, and image-to-video, via the FASHN REST API, the TypeScript SDK (fashn npm), or the Python SDK (fashn pip).
+description: Integrate FASHN generative image & video models for fashion into a project, or run it inline. Use for virtual try-on, product-to-model, model create/swap, face-to-model, edit, reframe, background removal, and image-to-video, via the FASHN REST API, the TypeScript SDK (fashn npm), or the Python SDK (fashn pip).
 allowed-tools: Bash, Read, Write, Edit
 ---
 
@@ -54,8 +54,6 @@ Never echo the key back, write it to a shell profile, or commit it.
 | Freeform edit | `edit` | `image`, `prompt` |
 | Change aspect ratio (outpaint/crop) | `reframe` | `image`, `aspect_ratio` |
 | Remove background → transparent PNG | `background-remove` | `image` |
-| Replace background from a prompt | `background-change` | `image`, `prompt` |
-| Commercial product packshot | `packshot` | `product_image` |
 | Animate an image → video | `image-to-video` | `image` |
 
 **Prediction lifecycle.** Two ways to get a result:
