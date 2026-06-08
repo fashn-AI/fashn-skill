@@ -189,11 +189,11 @@ For a single ad-hoc generation where the user just wants the result now (not an 
 
 1. Ensure installed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
 2. Resolve the key (env var, else the cache file): `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }; echo "${FASHN_API_KEY:+set}"` — if not `set`, follow [Authentication](#authentication).
-3. Run inline with a 120s timeout (subscribe polls until done); the leading line loads the cached key if it's not already in the environment:
+3. Run inline. **Feed the script via a single-quoted heredoc (`<<'NODE'`)** so the shell leaves backticks, `$`, and quotes in your code untouched, and run from `~/.fashn` so Node resolves the `fashn` import. The leading line loads the cached key if it isn't already in the environment:
 
 ```bash
 [ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }
-cd ~/.fashn && node --input-type=module -e "
+cd ~/.fashn && node --input-type=module <<'NODE'
 import Fashn from 'fashn';
 const client = new Fashn();
 const r = await client.predictions.subscribe({
@@ -202,13 +202,37 @@ const r = await client.predictions.subscribe({
     model_image: 'https://example.com/person.jpg',
     product_image: 'https://example.com/garment.jpg',
   },
+  timeout: 120000, // ms; subscribe polls until a terminal state
 });
-if (r.status === 'completed') console.log(JSON.stringify(r.output, null, 2));
-else console.error('Failed:', r.status, r.error?.name, r.error?.message);
-"
+if (r.status === 'completed') console.log(JSON.stringify({ output: r.output, creditsUsed: r.creditsUsed }, null, 2));
+else { console.error('Failed:', r.status, r.error?.name, r.error?.message); process.exit(1); }
+NODE
 ```
 
-Do **not** write script files for inline runs. When processing many images, back off on `429` responses.
+**Local image files** are passed as base64 data-URIs — read and encode them inside the script (the heredoc keeps template literals safe). Optionally download the result to an absolute path:
+
+```bash
+cd ~/.fashn && node --input-type=module <<'NODE'
+import Fashn from 'fashn';
+import { readFile, writeFile } from 'node:fs/promises';
+const b64 = await readFile('/abs/path/to/product.jpg', { encoding: 'base64' });
+const client = new Fashn();
+const r = await client.predictions.subscribe({
+  model_name: 'product-to-model',
+  inputs: { product_image: `data:image/jpeg;base64,${b64}`, aspect_ratio: '2:3' },
+});
+if (r.status !== 'completed') { console.error(r.status, r.error); process.exit(1); }
+const res = await fetch(r.output[0]);
+await writeFile('/abs/path/to/output.jpg', Buffer.from(await res.arrayBuffer()));
+console.log(JSON.stringify({ output: r.output, creditsUsed: r.creditsUsed }, null, 2));
+NODE
+```
+
+Notes:
+- **Run from `~/.fashn`** (where the SDK is installed). ESM resolves `fashn` from the working directory's `node_modules` and ignores `NODE_PATH`, so `cd` first — `-e`/heredoc scripts don't change this.
+- **Avoid `node -e "…"`** for any script containing backticks, `$`, or quotes — the shell will mangle it. The single-quoted heredoc above is interpolation-safe. Do **not** write script files for inline runs.
+- **Don't pass the key as `FASHN_API_KEY=… node …`** on the command line (it leaks into shell history and the process list) — use the env var or the `~/.fashn/.env` cache from step 2.
+- When processing many images, back off on `429` responses.
 
 ## Reference
 
