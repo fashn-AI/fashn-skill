@@ -55,7 +55,7 @@ Clone and link the repo into your agent's skills directory:
 ```bash
 git clone https://github.com/fashn-ai/fashn-skill.git
 # Claude Code (global):
-ln -s "$(pwd)/fashn-skill" ~/.claude/skills/fashn
+ln -s "$(pwd)/fashn-skill/skills/fashn" ~/.claude/skills/fashn
 ```
 
 ## Prerequisites
@@ -84,8 +84,8 @@ The agent will choose the right `model_name`, wire up the prediction lifecycle (
 
 | File | Purpose |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The skill — entry point, integration guide (REST / TS / Python), and inline quickstart |
-| [`reference.md`](reference.md) | Full endpoint catalog: every input, the error catalog, credits, webhooks, rate limits |
+| [`skills/fashn/SKILL.md`](skills/fashn/SKILL.md) | The skill — entry point, integration guide (REST / TS / Python), and inline quickstart |
+| [`skills/fashn/reference.md`](skills/fashn/reference.md) | Full endpoint catalog: every input, the error catalog, credits, webhooks, rate limits |
 
 ## Resources
 
