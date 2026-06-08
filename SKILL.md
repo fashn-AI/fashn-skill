@@ -23,21 +23,15 @@ When the user asks to *add FASHN to their app / repo*, integrate (write code int
 - All FASHN calls are server-side — **never hard-code the key or expose it client-side**.
 - REST: send `Authorization: Bearer $FASHN_API_KEY`. Both SDKs read `FASHN_API_KEY` from the environment by default.
 
-**Resolve the key before any call — check in order, and only prompt if all fail:**
+**Resolve the key (check in order; prompt only if all fail):**
 
-1. The `FASHN_API_KEY` environment variable (preferred). Confirm with `echo "${FASHN_API_KEY:+set}"` → prints `set` when present. This is what integration code, CI, and deployments use.
-2. The local cache file `~/.fashn/.env`. Load it, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`
-3. If still missing, ask the user for the key.
+1. `FASHN_API_KEY` env var — preferred, and what integration code, CI, and deploys use. Check: `echo "${FASHN_API_KEY:+set}"`.
+2. Cache file `~/.fashn/.env` — load, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`.
+3. Otherwise, ask the user.
 
-**Caching the key (inline use only).** After the user gives you a key, *offer* to save it so future inline runs don't re-prompt — and save **only with their explicit consent**:
+**Caching (inline use only, with explicit consent)** so later inline runs don't re-prompt: `umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' "<key>" > ~/.fashn/.env; chmod 600 ~/.fashn/.env`. Never echo the key, write it to a shell profile, or commit it.
 
-```bash
-umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' "<key>" > ~/.fashn/.env; chmod 600 ~/.fashn/.env
-```
-
-Never echo the key back, never write it to a shell profile (`~/.zshrc`, etc.), and never commit it. `~/.fashn/.env` lives outside any repo by design.
-
-**Integrations are different.** When wiring FASHN into a user's project, the key must come from that project's own environment — a gitignored `.env` or the platform's secret manager. Do **not** write it to `~/.fashn/.env` or anywhere in the repo for integration work.
+**Integrations differ:** pull the key from the *project's* own env (gitignored `.env`) or secret manager — never `~/.fashn/.env` or anywhere in the repo.
 
 ## Core concepts (apply to every path)
 
@@ -185,54 +179,31 @@ curl -s https://api.fashn.ai/v1/credits -H "Authorization: Bearer $FASHN_API_KEY
 
 ## Inline quickstart
 
-For a single ad-hoc generation where the user just wants the result now (not an integration), run the TS SDK from an isolated dir so you don't touch their project:
+For a one-off generation (not an integration), run the TS SDK from `~/.fashn` so you don't touch the user's project:
 
-1. Ensure installed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
-2. Resolve the key (env var, else the cache file): `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }; echo "${FASHN_API_KEY:+set}"` — if not `set`, follow [Authentication](#authentication).
-3. Run inline. **Feed the script via a single-quoted heredoc (`<<'NODE'`)** so the shell leaves backticks, `$`, and quotes in your code untouched, and run from `~/.fashn` so Node resolves the `fashn` import. The leading line loads the cached key if it isn't already in the environment:
+1. Install if needed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
+2. Resolve the key: `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }` — if still unset, see [Authentication](#authentication).
+3. Run it. **Pipe the script via a single-quoted heredoc** so the shell leaves backticks/`$`/quotes alone, and **`cd ~/.fashn`** first so ESM resolves the `fashn` import (it ignores `NODE_PATH`):
 
 ```bash
 [ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }
 cd ~/.fashn && node --input-type=module <<'NODE'
 import Fashn from 'fashn';
-const client = new Fashn();
-const r = await client.predictions.subscribe({
+const r = await new Fashn().predictions.subscribe({
   model_name: 'tryon-max',
   inputs: {
     model_image: 'https://example.com/person.jpg',
     product_image: 'https://example.com/garment.jpg',
   },
-  timeout: 120000, // ms; subscribe polls until a terminal state
+  timeout: 120000, // ms
 });
-if (r.status === 'completed') console.log(JSON.stringify({ output: r.output, creditsUsed: r.creditsUsed }, null, 2));
-else { console.error('Failed:', r.status, r.error?.name, r.error?.message); process.exit(1); }
-NODE
-```
-
-**Local image files** are passed as base64 data-URIs — read and encode them inside the script (the heredoc keeps template literals safe). Optionally download the result to an absolute path:
-
-```bash
-cd ~/.fashn && node --input-type=module <<'NODE'
-import Fashn from 'fashn';
-import { readFile, writeFile } from 'node:fs/promises';
-const b64 = await readFile('/abs/path/to/product.jpg', { encoding: 'base64' });
-const client = new Fashn();
-const r = await client.predictions.subscribe({
-  model_name: 'product-to-model',
-  inputs: { product_image: `data:image/jpeg;base64,${b64}`, aspect_ratio: '2:3' },
-});
-if (r.status !== 'completed') { console.error(r.status, r.error); process.exit(1); }
-const res = await fetch(r.output[0]);
-await writeFile('/abs/path/to/output.jpg', Buffer.from(await res.arrayBuffer()));
+if (r.status !== 'completed') { console.error('Failed:', r.status, r.error); process.exit(1); }
 console.log(JSON.stringify({ output: r.output, creditsUsed: r.creditsUsed }, null, 2));
 NODE
 ```
 
-Notes:
-- **Run from `~/.fashn`** (where the SDK is installed). ESM resolves `fashn` from the working directory's `node_modules` and ignores `NODE_PATH`, so `cd` first — `-e`/heredoc scripts don't change this.
-- **Avoid `node -e "…"`** for any script containing backticks, `$`, or quotes — the shell will mangle it. The single-quoted heredoc above is interpolation-safe. Do **not** write script files for inline runs.
-- **Don't pass the key as `FASHN_API_KEY=… node …`** on the command line (it leaks into shell history and the process list) — use the env var or the `~/.fashn/.env` cache from step 2.
-- When processing many images, back off on `429` responses.
+- **Local image inputs**: read the file as base64 (`readFile(path, { encoding: 'base64' })` from `node:fs/promises`) and pass it as `product_image: 'data:image/jpeg;base64,' + b64`. Save a result with `fetch(r.output[0])`.
+- Don't write script files or put the key on the command line (use step 2's cache); back off on `429` when batching.
 
 ## Reference
 
