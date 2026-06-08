@@ -15,9 +15,9 @@ Every job is `POST /v1/run` with a body of `{ model_name, inputs }`, then poll `
 | Submit | `POST /v1/run` | `client.predictions.run({ model_name, inputs })` | `client.predictions.run(model_name=, inputs=)` |
 | Poll | `GET /v1/status/{id}` | `client.predictions.status(id)` | `client.predictions.status(id)` |
 | Submit + auto-poll | (build your own loop) | `client.predictions.subscribe({ model_name, inputs })` | `client.predictions.subscribe(model_name=, inputs=)` |
-| Balance | `GET /v1/credits` | — (call REST) | — (call REST) |
+| Balance | `GET /v1/credits` | n/a (call REST) | n/a (call REST) |
 
-`subscribe()` options (SDK): `pollInterval` (ms, default `1000`), `timeout` (ms, default `300000` = 5 min), `maxRetries` (default `3`), and callbacks `onEnqueued(requestId)` / `onQueueUpdate(status)`. In-progress statuses (`starting`/`in_queue`/`processing`) are only delivered via `onQueueUpdate`; the resolved value is always terminal.
+`subscribe()` options (TS SDK): `pollInterval` (ms, default `1000`), `timeout` (ms, default `300000` = 5 min), `maxRetries` (default `3`), and callbacks `onEnqueued(requestId)` / `onQueueUpdate(status)`. The Python SDK uses snake_case: `poll_interval`, `timeout`, `max_retries`, `on_enqueued`, `on_queue_update`. In-progress statuses (`starting`/`in_queue`/`processing`) are only delivered via the queue-update callback; the resolved value is always terminal.
 
 ### Response shapes
 
@@ -38,22 +38,22 @@ Every job is `POST /v1/run` with a body of `{ model_name, inputs }`, then poll `
 }
 ```
 
-- **`status`** — `starting` | `in_queue` | `processing` | `completed` | `failed`. SDK `subscribe()` may additionally resolve to `canceled` or `time_out`.
-- **`output`** — array of CDN URLs (images, or MP4 for `image-to-video`); base64 data-URIs when `return_base64: true`.
-- **`error`** — `null`, or a runtime error `{ name, message }` (see [Errors](#errors)).
-- **Credits** — REST exposes the `x-fashn-credits-used` response header on status; SDK exposes `creditsUsed` (TS) / `credits_used` (Python) on the `subscribe`/`run` result.
+- **`status`**: `starting` | `in_queue` | `processing` | `completed` | `failed`. SDK `subscribe()` may additionally resolve to `canceled` or `time_out`.
+- **`output`**: array of CDN URLs (images, or MP4 for `image-to-video`); base64 data-URIs when `return_base64: true`.
+- **`error`**: `null`, or a runtime error `{ name, message }` (see [Errors](#errors)).
+- **Credits**: REST exposes the `x-fashn-credits-used` response header on status; SDK exposes `creditsUsed` (TS) / `credits_used` (Python) on the `subscribe`/`run` result.
 
 ## Common input parameters
 
 Most generation endpoints share these optional fields:
 
-- `aspect_ratio` — one of `21:9`, `1:1`, `4:3`, `3:2`, `2:3`, `5:4`, `4:5`, `3:4`, `16:9`, `9:16`.
-- `generation_mode` — quality/speed tradeoff. Values are endpoint-specific: try-on is `balanced` | `quality`; most generative endpoints add `fast` (`fast` | `balanced` | `quality`).
-- `resolution` — `1k` (~1 MP) | `2k` (~4 MP) | `4k` (~16 MP).
-- `num_images` (or `num_samples` on `tryon-v1.6`) — 1–4 outputs.
-- `output_format` — `png` (lossless) | `jpeg` (smaller).
-- `return_base64` — `true` returns base64 instead of a CDN URL (not stored server-side; expires 60 min).
-- `seed` — integer `0`–`2³²−1` for reproducibility.
+- `aspect_ratio`: one of `21:9`, `1:1`, `4:3`, `3:2`, `2:3`, `5:4`, `4:5`, `3:4`, `16:9`, `9:16`.
+- `generation_mode`: quality/speed tradeoff. Values are endpoint-specific: try-on is `balanced` | `quality`; most generative endpoints add `fast` (`fast` | `balanced` | `quality`).
+- `resolution`: `1k` (~1 MP) | `2k` (~4 MP) | `4k` (~16 MP).
+- `num_images` (or `num_samples` on `tryon-v1.6`): 1-4 outputs.
+- `output_format`: `png` (lossless) | `jpeg` (smaller).
+- `return_base64`: `true` returns base64 instead of a CDN URL (not stored server-side; expires 60 min).
+- `seed`: integer `0` to `2^32-1` for reproducibility.
 
 Image inputs accept an **HTTPS URL or a base64 data-URI** (must include the prefix, e.g. `data:image/jpg;base64,<...>`).
 
@@ -61,9 +61,9 @@ Image inputs accept an **HTTPS URL or a base64 data-URI** (must include the pref
 
 ## Endpoints
 
-### Virtual Try-On (flagship) — `tryon-max`
+### Virtual Try-On (flagship): `tryon-max`
 
-Premium try-on for AI fashion photoshoots and publishable e-commerce content (PDPs, catalogs, marketing). Processing ~20–120s depending on mode/resolution.
+Premium try-on for AI fashion photoshoots and publishable e-commerce content (PDPs, catalogs, marketing). Processing ~20-120s depending on mode/resolution.
 
 | Input | Type | Req | Notes |
 |---|---|---|---|
@@ -73,16 +73,16 @@ Premium try-on for AI fashion photoshoots and publishable e-commerce content (PD
 | `aspect_ratio` | enum | | See common list |
 | `generation_mode` | `balanced`\|`quality` | | Default auto-selected |
 | `resolution` | `1k`\|`2k`\|`4k` | | Default `1k` |
-| `num_images` | int 1–4 | | Default `1` |
+| `num_images` | int 1-4 | | Default `1` |
 | `output_format` | `png`\|`jpeg` | | Default `png` |
 | `seed` | int | | Default `42` |
 | `return_base64` | bool | | Default `false` |
 
 **Credits** (× `num_images`): `balanced` → 1k:2 / 2k:3 / 4k:4 · `quality` → 1k:3 / 2k:4 / 4k:5.
 
-### Virtual Try-On (legacy) — `tryon-v1.6`
+### Virtual Try-On (legacy): `tryon-v1.6`
 
-Fast, low-cost try-on from a single person + garment photo. Output 864×1296. Modes: `performance` ~5s, `balanced` ~8s, `quality` ~12–17s. Prefer `tryon-max` for publishable quality; use `tryon-v1.6` for speed/volume and fine moderation control.
+Fast, low-cost try-on from a single person + garment photo. Output 864×1296. Modes: `performance` ~5s, `balanced` ~8s, `quality` ~12-17s. Prefer `tryon-max` for publishable quality; use `tryon-v1.6` for speed/volume and fine moderation control.
 
 | Input | Type | Req | Notes |
 |---|---|---|---|
@@ -93,12 +93,12 @@ Fast, low-cost try-on from a single person + garment photo. Output 864×1296. Mo
 | `mode` | `performance`\|`balanced`\|`quality` | | Speed/quality tradeoff |
 | `moderation_level` | `conservative`\|`permissive`\|`none` | | Controls modesty filtering |
 | `segmentation_free` | bool | | Better extraction for bulky garments; set `false` if originals aren't removed |
-| `num_samples` | int 1–4 | | Default `1` |
+| `num_samples` | int 1-4 | | Default `1` |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Product to Model — `product-to-model`
+### Product to Model: `product-to-model`
 
 Turns a product image into a person wearing it. **Standard mode** (no `model_image`) generates a new person; **try-on mode** (`model_image` provided) adds the product to that person and matches its aspect ratio.
 
@@ -115,7 +115,7 @@ Turns a product image into a person wearing it. **Standard mode** (no `model_ima
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Model Create — `model-create`
+### Model Create: `model-create`
 
 Generates a fashion model from a text prompt, with optional pose/composition and face references.
 
@@ -128,12 +128,12 @@ Generates a fashion model from a text prompt, with optional pose/composition and
 | `aspect_ratio` | enum | | Canvas for text-only generation |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Model Swap — `model-swap`
+### Model Swap: `model-swap`
 
 Changes a model's identity (face, skin tone, hair) while preserving the outfit and pose exactly.
 
@@ -146,12 +146,12 @@ Changes a model's identity (face, skin tone, hair) while preserving the outfit a
 | `aspect_ratio` | enum | | |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Face to Model — `face-to-model`
+### Face to Model: `face-to-model`
 
 Converts a headshot/selfie into a try-on-ready upper-body avatar, preserving facial identity.
 
@@ -162,14 +162,14 @@ Converts a headshot/selfie into a try-on-ready upper-body avatar, preserving fac
 | `aspect_ratio` | enum | | Default `2:3`; vertical ratios look most natural |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | Default `jpeg` |
 | `seed` | int | | |
 | `return_base64` | bool | | Default `false` |
 
-### Edit — `edit`
+### Edit: `edit`
 
-Versatile post-processing: restyle, change views/poses, swap backgrounds, fix details — while preserving identity and product fidelity.
+Versatile post-processing: restyle, change views/poses, swap backgrounds, fix details, while preserving identity and product fidelity.
 
 | Input | Type | Req | Notes |
 |---|---|---|---|
@@ -180,12 +180,12 @@ Versatile post-processing: restyle, change views/poses, swap backgrounds, fix de
 | `aspect_ratio` | enum | | |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Reframe — `reframe`
+### Reframe: `reframe`
 
 Adjusts aspect ratio by intelligently outpainting (zoom-out) or cropping (zoom-in). Output ~1 MP. Returns an error if the source already matches the target within 2%.
 
@@ -194,21 +194,21 @@ Adjusts aspect ratio by intelligently outpainting (zoom-out) or cropping (zoom-i
 | `image` | image | ✅ | Source |
 | `aspect_ratio` | enum | ✅ | Target ratio |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Background Remove — `background-remove`
+### Background Remove: `background-remove`
 
-Removes the background, producing a transparent PNG cutout. Up to ~4 MP. Fast (~1–3s). Output is always PNG.
+Removes the background, producing a transparent PNG cutout. Up to ~4 MP. Fast (~1-3s). Output is always PNG.
 
 | Input | Type | Req | Notes |
 |---|---|---|---|
 | `image` | image | ✅ | Source |
 | `return_base64` | bool | | Returns base64 PNG instead of CDN URL |
 
-### Background Change — `background-change`
+### Background Change: `background-change`
 
 Detects the foreground subject and replaces the background from a prompt, harmonizing lighting.
 
@@ -218,12 +218,12 @@ Detects the foreground subject and replaces the background from a prompt, harmon
 | `prompt` | string | ✅ | New background, e.g. `"beach sunset"`, `"modern office"` |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Packshot — `packshot`
+### Packshot: `packshot`
 
 Turns a product photo into a clean commercial packshot (studio presentation), optionally guided by a style reference.
 
@@ -235,12 +235,12 @@ Turns a product photo into a clean commercial packshot (studio presentation), op
 | `aspect_ratio` | enum | | |
 | `generation_mode` | `fast`\|`balanced`\|`quality` | | |
 | `resolution` | `1k`\|`2k`\|`4k` | | |
-| `num_images` | int 1–4 | | |
+| `num_images` | int 1-4 | | |
 | `output_format` | `png`\|`jpeg` | | |
 | `seed` | int | | |
 | `return_base64` | bool | | |
 
-### Image to Video — `image-to-video`
+### Image to Video: `image-to-video`
 
 Animates a single image into a short fashion clip. `output` is an MP4 CDN URL.
 
@@ -258,14 +258,14 @@ Animates a single image into a short fashion clip. `output` is an MP4 CDN URL.
 
 ## Credits & pricing
 
-- Cost scales with `generation_mode` and `resolution` and `num_images`. The documented `tryon-max` table is above; for current per-endpoint pricing see https://fashn.ai/pricing#api.
+- Cost scales with `generation_mode`, `resolution`, and `num_images`. The documented `tryon-max` table is above; for current per-endpoint pricing see https://fashn.ai/pricing#api.
 - **Failed predictions are not charged.**
 - Actual spend per call: read the `x-fashn-credits-used` header (REST) or `creditsUsed`/`credits_used` (SDK).
 - Balance: `GET /v1/credits` → `{ "credits": { "total": 234, "subscription": 100, "on_demand": 134 } }`. `subscription` credits reset each billing cycle and are spent before `on_demand`.
 
 ## Errors
 
-**API errors** — HTTP 4xx/5xx returned *before* the job runs. REST body: `{ "error": "<Code>", "message": "<desc>" }`. SDKs throw `APIError` subclasses (TS: `Fashn.APIError` with `err.status`; Python: `fashn.APIError` with `e.status_code`).
+**API errors**: HTTP 4xx/5xx returned *before* the job runs. REST body: `{ "error": "<Code>", "message": "<desc>" }`. SDKs throw `APIError` subclasses (TS: `Fashn.APIError` with `err.status`; Python: `fashn.APIError` with `e.status_code`).
 
 | HTTP | Codes |
 |---|---|
@@ -275,7 +275,7 @@ Animates a single image into a short fashion clip. `output` is an MP4 CDN URL.
 | 429 | `RateLimitExceeded`, `ConcurrencyLimitExceeded`, `OutOfCredits` |
 | 500 | `InternalServerError` |
 
-**Runtime errors** — the job ran but failed: HTTP 200 with `status: "failed"` and `error: { name, message }`. Always branch on `status` even when nothing throws.
+**Runtime errors**: the job ran but failed: HTTP 200 with `status: "failed"` and `error: { name, message }`. Always branch on `status` even when nothing throws.
 
 | `error.name` | Cause / fix |
 |---|---|
@@ -307,17 +307,11 @@ FASHN POSTs the terminal envelope to that URL:
 
 - Delivered on terminal states only (`completed` / `failed`).
 - Failed deliveries (non-2xx) are retried up to **5 times** over **~5 minutes**.
-- **No signature verification** is provided — make handlers **idempotent** and respond `2xx` quickly.
+- **No signature verification** is provided, so make handlers **idempotent** and respond `2xx` quickly.
 
 ## Rate limits
 
-| Endpoint | Limit |
-|---|---|
-| `POST /v1/run` | 50 requests / 60s |
-| `GET /v1/status/{id}` | 50 requests / 10s |
-| `GET /v1/credits` | 30 requests / 10s |
-
-When batching, handle `429` (`RateLimitExceeded` / `ConcurrencyLimitExceeded`) with backoff.
+Requests are rate-limited per endpoint. When batching, handle `429` (`RateLimitExceeded` / `ConcurrencyLimitExceeded`) with backoff.
 
 ## Notes
 

@@ -1,35 +1,35 @@
 ---
 name: fashn
-description: Integrate FASHN fashion-AI image & video generation into a project, or run it inline. Use for virtual try-on, product-to-model, model create/swap, face-to-model, edit, reframe, background remove/change, packshot, and image-to-video — via the FASHN REST API, the TypeScript SDK (fashn npm), or the Python SDK (fashn pip).
+description: Integrate FASHN generative image & video models for fashion into a project, or run it inline. Use for virtual try-on, product-to-model, model create/swap, face-to-model, edit, reframe, background remove/change, packshot, and image-to-video, via the FASHN REST API, the TypeScript SDK (fashn npm), or the Python SDK (fashn pip).
 allowed-tools: Bash, Read, Write, Edit
 ---
 
-# FASHN — Fashion AI API & SDKs
+# FASHN API & SDKs
 
-FASHN is a fashion-AI platform: virtual try-on, AI models, product photography, editing, and image-to-video. Everything runs through **one prediction endpoint** that takes a `model_name` plus an `inputs` object.
+FASHN is an AI-first company specializing in human-centric generative image models tailored for fashion applications: virtual try-on, AI models, product photography, editing, and image-to-video. Everything runs through **one prediction endpoint** that takes a `model_name` plus an `inputs` object.
 
 This skill helps you do two things:
 
-1. **Integrate FASHN into a project** — write production code against the REST API, the **TypeScript SDK** (`fashn` on npm), or the **Python SDK** (`fashn` on PyPI).
-2. **Run a one-off generation inline** — execute a single call and hand the result back to the user (see [Inline quickstart](#inline-quickstart)).
+1. **Integrate FASHN into a project**: write production code against the REST API, the **TypeScript SDK** (`fashn` on npm), or the **Python SDK** (`fashn` on PyPI).
+2. **Run a one-off generation inline**: execute a single call and hand the result back to the user (see [Inline quickstart](#inline-quickstart)).
 
 When the user asks to *add FASHN to their app / repo*, integrate (write code into their project). When they ask to *just do a try-on / generate an image now*, run it inline.
 
-> Full per-endpoint parameter tables, the error catalog, webhooks, and credits live in **[reference.md](reference.md)** — load it when you need exact `inputs` for a given `model_name`.
+> Full per-endpoint parameter tables, the error catalog, webhooks, and credits live in **[reference.md](reference.md)**. Load it when you need exact `inputs` for a given `model_name`.
 
 ## Authentication
 
 - Get an API key from the Developer API dashboard: https://app.fashn.ai/api
-- All FASHN calls are server-side — **never hard-code the key or expose it client-side**.
+- All FASHN calls are server-side: **never hard-code the key or expose it client-side**.
 - REST: send `Authorization: Bearer $FASHN_API_KEY`. Both SDKs read `FASHN_API_KEY` from the environment by default.
 
 **Resolve the key (check in order; prompt only if all fail):**
 
-1. `FASHN_API_KEY` env var — preferred, and what integration code, CI, and deploys use. Check: `echo "${FASHN_API_KEY:+set}"`.
-2. Cache file `~/.fashn/.env` — load, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`.
-3. Otherwise, ask the user — and cache it (next bullet).
+1. `FASHN_API_KEY` env var (preferred, used by integration code, CI, and deploys). Check: `echo "${FASHN_API_KEY:+set}"`.
+2. Cache file `~/.fashn/.env`. Load, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`.
+3. Otherwise, ask the user, then cache it (next bullet).
 
-**Caching (inline use only).** When you had to ask the user for the key, **save it to `~/.fashn/.env` by default** (right after you receive it) so later inline runs don't re-prompt — then tell the user it's cached there and that `rm ~/.fashn/.env` removes it. Only skip if they decline. Run:
+**Caching (inline use only).** When you had to ask the user for the key, **save it to `~/.fashn/.env` by default** (right after you receive it) so later inline runs don't re-prompt, then tell the user it's cached there and that `rm ~/.fashn/.env` removes it. Only skip if they decline. Run:
 
 ```bash
 umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' '<key>' > ~/.fashn/.env; chmod 600 ~/.fashn/.env
@@ -37,7 +37,7 @@ umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' '<key>' > ~/.fashn/.en
 
 Never echo the key back, write it to a shell profile, or commit it.
 
-**Integrations differ:** pull the key from the *project's* own env (gitignored `.env`) or secret manager — never `~/.fashn/.env` or anywhere in the repo.
+**Integrations differ:** pull the key from the *project's* own env (gitignored `.env`) or secret manager, never `~/.fashn/.env` or anywhere in the repo.
 
 ## Core concepts (apply to every path)
 
@@ -60,8 +60,8 @@ Never echo the key back, write it to a shell profile, or commit it.
 
 **Prediction lifecycle.** Two ways to get a result:
 
-- **`subscribe` (recommended)** — submit and auto-poll until a terminal state, then return the final result. Both SDKs expose this; for raw REST you implement the poll loop yourself.
-- **Manual `run` + `status`** — `run` returns a prediction `id` immediately; poll `status(id)` until `completed`/`failed`. Use this for fire-and-forget, your own queue, or when pairing with **webhooks**.
+- **`subscribe` (recommended)**: submit and auto-poll until a terminal state, then return the final result. Both SDKs expose this; for raw REST you implement the poll loop yourself.
+- **Manual `run` + `status`**: `run` returns a prediction `id` immediately; poll `status(id)` until `completed`/`failed`. Use this for fire-and-forget, your own queue, or when pairing with **webhooks**.
 
 **Response envelope.** A terminal prediction looks like:
 
@@ -73,17 +73,17 @@ Never echo the key back, write it to a shell profile, or commit it.
 - `output`: array of CDN image URLs (or base64 if `return_base64: true`); MP4 URLs for `image-to-video`.
 - `error`: `null` on success, else `{ name, message }`.
 
-**Credits.** Spend is returned in the `x-fashn-credits-used` response header (REST) and as `creditsUsed` (TS) / `credits_used` (Python) on the result. **Failed predictions are not charged.** Cost scales with `generation_mode` and `resolution` — see reference.md. Check the balance with `GET /v1/credits`.
+**Credits.** Spend is returned in the `x-fashn-credits-used` response header (REST) and as `creditsUsed` (TS) / `credits_used` (Python) on the result. **Failed predictions are not charged.** Cost scales with `generation_mode` and `resolution`; see reference.md. Check the balance with `GET /v1/credits`.
 
-**Errors — two kinds:**
+**Errors (two kinds):**
 - *API errors* (HTTP 4xx/5xx, before the job runs): SDKs throw (`APIError` subclasses); REST returns `{ "error": "<Code>", "message": "..." }`.
-- *Runtime errors* (job ran but failed): HTTP 200 with `status: "failed"` and `error: { name, message }` — e.g. `ImageLoadError`, `ContentModerationError`, `PoseError`. Always branch on `status` even when no exception is thrown.
+- *Runtime errors* (job ran but failed): HTTP 200 with `status: "failed"` and `error: { name, message }`, e.g. `ImageLoadError`, `ContentModerationError`, `PoseError`. Always branch on `status` even when no exception is thrown.
 
-**Limits:** `/v1/run` 50 req/60s, `/v1/status` 50 req/10s. Handle `429` responses with backoff when batching.
+**Limits:** handle `429` responses with backoff when batching.
 
 ---
 
-## Path A — TypeScript SDK (`fashn`)
+## Path A: TypeScript SDK (`fashn`)
 
 Install into the user's project: `npm install fashn`
 
@@ -130,7 +130,7 @@ try {
 }
 ```
 
-## Path B — Python SDK (`fashn`)
+## Path B: Python SDK (`fashn`)
 
 Install into the user's project: `pip install fashn`
 
@@ -158,7 +158,7 @@ Manual lifecycle: `client.predictions.run(...)` → `client.predictions.status(p
 Async: use `from fashn import AsyncFashn` and `await client.predictions.subscribe(...)`.
 API errors raise `fashn.APIError` (`e.status_code`, `e.message`); runtime failures arrive as `result.status == "failed"` with `result.error`.
 
-## Path C — REST (any language)
+## Path C: REST (any language)
 
 Base URL `https://api.fashn.ai/v1`. Submit, then poll.
 
@@ -188,7 +188,7 @@ curl -s https://api.fashn.ai/v1/credits -H "Authorization: Bearer $FASHN_API_KEY
 For a one-off generation (not an integration), run the TS SDK from `~/.fashn` so you don't touch the user's project:
 
 1. Install if needed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
-2. Resolve the key: `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }` — if still unset, see [Authentication](#authentication).
+2. Resolve the key: `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }`. If still unset, see [Authentication](#authentication).
 3. Run it. **Pipe the script via a single-quoted heredoc** so the shell leaves backticks/`$`/quotes alone, and **`cd ~/.fashn`** first so ESM resolves the `fashn` import (it ignores `NODE_PATH`):
 
 ```bash
