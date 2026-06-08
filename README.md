@@ -26,7 +26,7 @@ Install with [skills.sh](https://www.skills.sh/docs):
 npx skills add fashn-ai/fashn-skill
 ```
 
-The CLI auto-detects which coding agents you have installed and configures the skill for each. Supported agents include **Claude Code, Codex, Cursor, GitHub Copilot, Windsurf, Gemini, Cline, AMP, Antigravity, and ClawdBot**.
+The CLI auto-detects which coding agents you have installed and configures the skill for each. Supported agents include **Claude Code, Codex, Cursor, and many others**.
 
 Useful flags:
 
@@ -65,7 +65,7 @@ Once installed, your agent loads the skill automatically (restart the agent if a
 
 - **Integrate**: *"Add FASHN virtual try-on to my Next.js app using the TypeScript SDK."*
 - **Run inline**: *"Do a try-on with this model photo and this garment."*
-- In Claude Code you can also invoke it directly with `/fashn`.
+- In Claude Code and Codex you can also invoke it directly with `/fashn`.
 
 The agent will choose the right `model_name`, wire up the prediction lifecycle (`subscribe` or manual `run` + `status`), and handle the response envelope, credits, and errors.
 
