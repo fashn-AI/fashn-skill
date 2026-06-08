@@ -20,11 +20,24 @@ When the user asks to *add FASHN to their app / repo*, integrate (write code int
 ## Authentication
 
 - Get an API key from the Developer API dashboard: https://app.fashn.ai/api
-- Store it as the `FASHN_API_KEY` environment variable. **Never hard-code it or expose it client-side** — all FASHN calls are server-side.
-- REST: send `Authorization: Bearer $FASHN_API_KEY`.
-- Both SDKs read `FASHN_API_KEY` from the environment by default.
+- All FASHN calls are server-side — **never hard-code the key or expose it client-side**.
+- REST: send `Authorization: Bearer $FASHN_API_KEY`. Both SDKs read `FASHN_API_KEY` from the environment by default.
 
-Before running anything, confirm the key exists: `echo "${FASHN_API_KEY:+set}"` should print `set`. If it's empty, ask the user to provide/export it.
+**Resolve the key before any call — check in order, and only prompt if all fail:**
+
+1. The `FASHN_API_KEY` environment variable (preferred). Confirm with `echo "${FASHN_API_KEY:+set}"` → prints `set` when present. This is what integration code, CI, and deployments use.
+2. The local cache file `~/.fashn/.env`. Load it, then re-check: `set -a; [ -f ~/.fashn/.env ] && . ~/.fashn/.env; set +a`
+3. If still missing, ask the user for the key.
+
+**Caching the key (inline use only).** After the user gives you a key, *offer* to save it so future inline runs don't re-prompt — and save **only with their explicit consent**:
+
+```bash
+umask 077; mkdir -p ~/.fashn; printf 'FASHN_API_KEY=%s\n' "<key>" > ~/.fashn/.env; chmod 600 ~/.fashn/.env
+```
+
+Never echo the key back, never write it to a shell profile (`~/.zshrc`, etc.), and never commit it. `~/.fashn/.env` lives outside any repo by design.
+
+**Integrations are different.** When wiring FASHN into a user's project, the key must come from that project's own environment — a gitignored `.env` or the platform's secret manager. Do **not** write it to `~/.fashn/.env` or anywhere in the repo for integration work.
 
 ## Core concepts (apply to every path)
 
@@ -57,7 +70,7 @@ Before running anything, confirm the key exists: `echo "${FASHN_API_KEY:+set}"` 
 ```
 
 - `status`: `starting` → `in_queue` → `processing` → `completed` | `failed` (SDK `subscribe` may also return `canceled` / `time_out`).
-- `output`: array of CDN image URLs (or base64 if `return_base64: true`); MP4 URLs for `image-to-video`. **CDN URLs expire after 72h; base64 outputs after 60min.**
+- `output`: array of CDN image URLs (or base64 if `return_base64: true`); MP4 URLs for `image-to-video`.
 - `error`: `null` on success, else `{ name, message }`.
 
 **Credits.** Spend is returned in the `x-fashn-credits-used` response header (REST) and as `creditsUsed` (TS) / `credits_used` (Python) on the result. **Failed predictions are not charged.** Cost scales with `generation_mode` and `resolution` — see reference.md. Check the balance with `GET /v1/credits`.
@@ -175,10 +188,11 @@ curl -s https://api.fashn.ai/v1/credits -H "Authorization: Bearer $FASHN_API_KEY
 For a single ad-hoc generation where the user just wants the result now (not an integration), run the TS SDK from an isolated dir so you don't touch their project:
 
 1. Ensure installed: `ls ~/.fashn/node_modules/fashn 2>/dev/null || npm install --prefix ~/.fashn fashn`
-2. Confirm the key: `echo "${FASHN_API_KEY:+set}"`
-3. Run inline with a 120s timeout (subscribe polls until done):
+2. Resolve the key (env var, else the cache file): `[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }; echo "${FASHN_API_KEY:+set}"` — if not `set`, follow [Authentication](#authentication).
+3. Run inline with a 120s timeout (subscribe polls until done); the leading line loads the cached key if it's not already in the environment:
 
 ```bash
+[ -z "$FASHN_API_KEY" ] && { set -a; . ~/.fashn/.env 2>/dev/null; set +a; }
 cd ~/.fashn && node --input-type=module -e "
 import Fashn from 'fashn';
 const client = new Fashn();

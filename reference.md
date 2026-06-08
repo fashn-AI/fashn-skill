@@ -39,7 +39,7 @@ Every job is `POST /v1/run` with a body of `{ model_name, inputs }`, then poll `
 ```
 
 - **`status`** — `starting` | `in_queue` | `processing` | `completed` | `failed`. SDK `subscribe()` may additionally resolve to `canceled` or `time_out`.
-- **`output`** — array of CDN URLs (images, or MP4 for `image-to-video`); base64 data-URIs when `return_base64: true`. CDN URLs expire after **72h**; base64 outputs after **60min**.
+- **`output`** — array of CDN URLs (images, or MP4 for `image-to-video`); base64 data-URIs when `return_base64: true`.
 - **`error`** — `null`, or a runtime error `{ name, message }` (see [Errors](#errors)).
 - **Credits** — REST exposes the `x-fashn-credits-used` response header on status; SDK exposes `creditsUsed` (TS) / `credits_used` (Python) on the `subscribe`/`run` result.
 
@@ -323,6 +323,6 @@ When batching, keep ≤ 6 predictions in flight and handle `429` (`RateLimitExce
 ## Notes
 
 - All FASHN calls are server-side; never expose `FASHN_API_KEY` in client code.
-- Use `return_base64: true` when you don't want outputs stored on FASHN's CDN (expire after 60 min vs. 72h).
+- Use `return_base64: true` when you don't want outputs stored on FASHN's CDN; base64 outputs are not stored server-side.
 - `seed` makes results reproducible for identical inputs; vary it to force new variations.
 - The SDK auto-retries connection errors/timeouts (3 retries by default) for API calls.
