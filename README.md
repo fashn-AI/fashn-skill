@@ -1,22 +1,20 @@
 # FASHN Agent Skill
 
-An [agent skill](https://www.skills.sh/docs) that teaches coding agents (Claude Code, Codex, Cursor, and more) how to integrate **[FASHN](https://fashn.ai)**, whose human-centric generative image models power virtual try-on, AI models, product photography, image editing, and image-to-video.
+An [agent skill](https://www.skills.sh/docs) that teaches coding agents (Claude Code, Codex, Cursor, and more) how to use the **[FASHN](https://fashn.ai) Agent**: send a plain-language prompt plus up to 6 images, and get back on-model photos, virtual try-ons, packshots, catalog images, lookbooks, and fashion videos.
 
-The skill covers both the **REST API** and the official **TypeScript** and **Python** SDKs, so an agent can wire FASHN into a project, or run a one-off generation inline.
+The skill does two jobs:
+
+- **Generate now**: make images and videos in the conversation through the **FASHN MCP** server, with prompting, cost, and file-handling guidance.
+- **Integrate**: write code against the **FASHN Agent API** (REST) for an app, script, or pipeline.
 
 ## Capabilities
 
-The skill knows the full FASHN surface (every endpoint, its `inputs`, the error catalog, credits, and webhooks):
-
-| Use case | `model_name` |
+| Endpoint | What you get |
 |---|---|
-| Virtual try-on (flagship / legacy) | `tryon-max` · `tryon-v1.6` |
-| Product → person wearing it | `product-to-model` |
-| Generate / swap a model | `model-create` · `model-swap` |
-| Headshot → upper-body avatar | `face-to-model` |
-| Freeform edit · reframe | `edit` · `reframe` |
-| Remove background | `background-remove` |
-| Image → video | `image-to-video` |
+| Agent Images (`/v1/agent/images`) | On-model photos, virtual try-ons, model swaps, packshots, catalog images, lookbooks, edits, background removal, upscales |
+| Agent Videos (`/v1/agent/videos`) | On-model videos, product clips, transitions between looks (4 to 15 s, optional sound) |
+
+The skill knows every parameter, the run and poll flow, webhooks, credits, limits, and errors, plus how to write prompts the Agent handles well. FASHN's single-task endpoints (e.g. `tryon-max`) are covered in the reference for the few cases that still need them.
 
 ## Install
 
@@ -49,36 +47,36 @@ Manage it later with `npx skills list`, `npx skills update fashn`, or `npx skill
 
 ## Prerequisites
 
-- A **FASHN API key**, generated at the [Developer API dashboard](https://app.fashn.ai/api).
-  Export it as `FASHN_API_KEY` (the REST calls and both SDKs read it from the environment):
+- **To generate in the conversation:** connect the FASHN MCP server (`https://api.fashn.ai/mcp`). In Claude Code:
 
   ```bash
-  export FASHN_API_KEY="your-key-here"
+  claude mcp add --transport http fashn https://api.fashn.ai/mcp
   ```
 
-- For the **SDK paths**: Node.js 18+ (TypeScript) or Python 3.8+ (Python).
-  Both SDKs are published as `fashn`: `npm install fashn` or `pip install fashn`.
+  Other agents take the same URL in their MCP settings.
+
+- **To integrate:** a **FASHN API key** from the [Developer API dashboard](https://app.fashn.ai/api), stored in your project's environment as `FASHN_API_KEY` (e.g. a gitignored `.env`). Never commit it or expose it client-side.
 
 ## Usage
 
 Once installed, your agent loads the skill automatically (restart the agent if a session is already open). Then just ask:
 
-- **Integrate**: *"Add FASHN virtual try-on to my Next.js app using the TypeScript SDK."*
-- **Run inline**: *"Do a try-on with this model photo and this garment."*
+- **Generate**: *"Put the dress from dress.jpg on the model in model.jpg, studio light, full body."* or *"Make a four-look lookbook from these six photos."*
+- **Integrate**: *"Add a 'generate on-model photos' action to my product admin."* or *"Write a script that turns every product photo in ./products into an on-model photo."*
 - In Claude Code and Codex you can also invoke it directly with `/fashn`.
 
-The agent will choose the right `model_name`, wire up the prediction lifecycle (`subscribe` or manual `run` + `status`), and handle the response envelope, credits, and errors.
+For generations, the agent calls the FASHN MCP tools and hands you the full-size links. For integrations, it writes code against the Agent API, wires up the run, poll, or webhook flow, and handles the response, credits, and errors.
 
 ## What's in this repo
 
 | File | Purpose |
 |---|---|
-| [`skills/fashn/SKILL.md`](skills/fashn/SKILL.md) | The skill: entry point, integration guide (REST / TS / Python), and inline quickstart |
-| [`skills/fashn/reference.md`](skills/fashn/reference.md) | Full endpoint catalog: every input, the error catalog, credits, webhooks, rate limits |
+| [`skills/fashn/SKILL.md`](skills/fashn/SKILL.md) | The skill: entry point, prompting tips, MCP generation guide, and Agent API integration guide (TypeScript and Python) |
+| [`skills/fashn/reference.md`](skills/fashn/reference.md) | Full API reference: Agent API parameters, limits, errors, credits, webhooks, plus the single-task endpoints |
 
 ## Resources
 
 - **Docs:** https://docs.fashn.ai
 - **API keys & dashboard:** https://app.fashn.ai/api
 - **Pricing:** https://fashn.ai/pricing#api
-- **TypeScript SDK:** https://github.com/fashn-AI/fashn-typescript-sdk
+- **FASHN Agent API:** https://docs.fashn.ai/api-reference/agent-images · https://docs.fashn.ai/api-reference/agent-videos
